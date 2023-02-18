@@ -22,11 +22,13 @@ import random
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Type, Union
 
+import pandas as pd
 import torch
 import torchvision
 from PIL import Image, ImageFilter, ImageOps
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from torch.utils.data import DataLoader
+from torch.utils.data.dataloader import default_collate
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
 from torchvision.datasets import STL10, ImageFolder
@@ -55,6 +57,34 @@ def dataset_with_index(DatasetClass: Type[Dataset]) -> Type[Dataset]:
             return (index, *data)
 
     return DatasetWithIndex
+
+
+class L3D(Dataset):
+    def __init__(self, root, transform=None):
+        self.root = Path(root)
+        self.transform = transform
+        self.images = self._load_data(root)
+
+    @staticmethod
+    def _load_data(data_path, split='train'):
+        df = pd.read_csv(os.path.join(data_path, split + '.csv'))
+        data = [os.path.join(data_path, i) for i in df.image_uri.tolist()]
+        return data
+
+    def __getitem__(self, index):
+
+        try:
+            path = self.root / self.images[index]
+            x = Image.open(path).convert("RGB")
+            if self.transform is not None:
+                x = self.transform(x)
+        except Exception as e:
+            print(e)
+            return None
+        return x, -1
+
+    def __len__(self):
+        return len(self.images)
 
 
 class CustomDatasetWithoutLabels(Dataset):
@@ -209,6 +239,7 @@ def build_transform_pipeline(dataset, cfg):
         "stl10": ((0.4914, 0.4823, 0.4466), (0.247, 0.243, 0.261)),
         "imagenet100": (IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD),
         "imagenet": (IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD),
+        "l3d": (IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD),
     }
 
     mean, std = MEANS_N_STD.get(
@@ -270,7 +301,7 @@ def build_transform_pipeline(dataset, cfg):
 
 
 def prepare_n_crop_transform(
-    transforms: List[Callable], num_crops_per_aug: List[int]
+        transforms: List[Callable], num_crops_per_aug: List[int]
 ) -> NCropAugmentation:
     """Turns a single crop transformation to an N crops transformation.
 
@@ -291,13 +322,13 @@ def prepare_n_crop_transform(
 
 
 def prepare_datasets(
-    dataset: str,
-    transform: Callable,
-    train_data_path: Optional[Union[str, Path]] = None,
-    data_format: Optional[str] = "image_folder",
-    no_labels: Optional[Union[str, Path]] = False,
-    download: bool = True,
-    data_fraction: float = -1.0,
+        dataset: str,
+        transform: Callable,
+        train_data_path: Optional[Union[str, Path]] = None,
+        data_format: Optional[str] = "image_folder",
+        no_labels: Optional[Union[str, Path]] = False,
+        download: bool = True,
+        data_fraction: float = -1.0,
 ) -> Dataset:
     """Prepares the desired dataset.
 
@@ -350,6 +381,10 @@ def prepare_datasets(
 
         train_dataset = dataset_with_index(dataset_class)(train_data_path, transform)
 
+    elif dataset == "l3d":
+        dataset_class = L3D
+        train_dataset = dataset_with_index(dataset_class)(train_data_path, transform)
+
     if data_fraction > 0:
         assert data_fraction < 1, "Only use data_fraction for values smaller than 1."
         data = train_dataset.samples
@@ -366,8 +401,13 @@ def prepare_datasets(
     return train_dataset
 
 
+def drop_none_collate(batch):
+    batch = list(filter(lambda x: x is not None, batch))
+    return default_collate(batch)
+
+
 def prepare_dataloader(
-    train_dataset: Dataset, batch_size: int = 64, num_workers: int = 4
+        train_dataset: Dataset, batch_size: int = 64, num_workers: int = 4
 ) -> DataLoader:
     """Prepares the training dataloader for pretraining.
     Args:
@@ -385,5 +425,6 @@ def prepare_dataloader(
         num_workers=num_workers,
         pin_memory=True,
         drop_last=True,
+        collate_fn=drop_none_collate
     )
     return train_loader

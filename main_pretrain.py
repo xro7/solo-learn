@@ -43,7 +43,8 @@ from solo.utils.checkpointer import Checkpointer
 from solo.utils.misc import make_contiguous
 
 try:
-    from solo.data.dali_dataloader import PretrainDALIDataModule, build_transform_pipeline_dali
+    from solo.data.dali_dataloader import PretrainDALIDataModule, L3DPretrainDALIDataModule, \
+        build_transform_pipeline_dali
 except ImportError:
     _dali_avaliable = False
 else:
@@ -73,6 +74,7 @@ def main(cfg: DictConfig):
         assert cfg.method in ["wmse", "mae"]
 
     model = METHODS[cfg.method](cfg)
+    print(model)
     make_contiguous(model)
     # can provide up to ~20% speed up
     if not cfg.performance.disable_channel_last:
@@ -80,6 +82,8 @@ def main(cfg: DictConfig):
 
     # validation dataloader for when it is available
     if cfg.data.dataset == "custom" and (cfg.data.no_labels or cfg.data.val_path is None):
+        val_loader = None
+    elif cfg.data.dataset in ["l3d"] and cfg.data.val_path is None:
         val_loader = None
     elif cfg.data.dataset in ["imagenet100", "imagenet"] and cfg.data.val_path is None:
         val_loader = None
@@ -115,19 +119,34 @@ def main(cfg: DictConfig):
             )
         transform = FullTransformPipeline(pipelines)
 
-        dali_datamodule = PretrainDALIDataModule(
-            dataset=cfg.data.dataset,
-            train_data_path=cfg.data.train_path,
-            transforms=transform,
-            num_large_crops=cfg.data.num_large_crops,
-            num_small_crops=cfg.data.num_small_crops,
-            num_workers=cfg.data.num_workers,
-            batch_size=cfg.optimizer.batch_size,
-            no_labels=cfg.data.no_labels,
-            data_fraction=cfg.data.fraction,
-            dali_device=cfg.dali.device,
-            encode_indexes_into_labels=cfg.dali.encode_indexes_into_labels,
-        )
+        if cfg.data.dataset == 'l3d':
+            dali_datamodule = L3DPretrainDALIDataModule(
+                dataset=cfg.data.dataset,
+                train_data_path=cfg.data.train_path,
+                transforms=transform,
+                num_large_crops=cfg.data.num_large_crops,
+                num_small_crops=cfg.data.num_small_crops,
+                num_workers=cfg.data.num_workers,
+                batch_size=cfg.optimizer.batch_size,
+                no_labels=cfg.data.no_labels,
+                data_fraction=cfg.data.fraction,
+                dali_device=cfg.dali.device,
+                encode_indexes_into_labels=cfg.dali.encode_indexes_into_labels,
+            )
+        else:
+            dali_datamodule = PretrainDALIDataModule(
+                dataset=cfg.data.dataset,
+                train_data_path=cfg.data.train_path,
+                transforms=transform,
+                num_large_crops=cfg.data.num_large_crops,
+                num_small_crops=cfg.data.num_small_crops,
+                num_workers=cfg.data.num_workers,
+                batch_size=cfg.optimizer.batch_size,
+                no_labels=cfg.data.no_labels,
+                data_fraction=cfg.data.fraction,
+                dali_device=cfg.dali.device,
+                encode_indexes_into_labels=cfg.dali.encode_indexes_into_labels,
+            )
         dali_datamodule.val_dataloader = lambda: val_loader
     else:
         pipelines = []

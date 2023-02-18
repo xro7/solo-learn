@@ -19,6 +19,7 @@ _N_CLASSES_PER_DATASET = {
     "cifar100": 100,
     "stl10": 10,
     "imagenet": 1000,
+    "l3d": 1000, # hack to make this work
     "imagenet100": 100,
 }
 
@@ -29,6 +30,7 @@ _SUPPORTED_DATASETS = [
     "imagenet",
     "imagenet100",
     "custom",
+    "l3d",
 ]
 
 

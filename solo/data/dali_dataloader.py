@@ -33,6 +33,7 @@ from nvidia.dali.pipeline import pipeline_def
 from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
 from solo.utils.misc import omegaconf_select
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+import pandas as pd
 
 
 class Mux:
@@ -75,13 +76,13 @@ class RandomGrayScaleConversion:
 
 class RandomColorJitter:
     def __init__(
-        self,
-        brightness: float,
-        contrast: float,
-        saturation: float,
-        hue: float,
-        prob: float = 0.8,
-        device: str = "gpu",
+            self,
+            brightness: float,
+            contrast: float,
+            saturation: float,
+            hue: float,
+            prob: float = 0.8,
+            device: str = "gpu",
     ):
         """Applies random color jittering with probability.
 
@@ -182,17 +183,17 @@ class RandomSolarize:
 
 class NormalPipelineBuilder:
     def __init__(
-        self,
-        data_path: str,
-        batch_size: int,
-        device: str,
-        validation: bool = False,
-        device_id: int = 0,
-        shard_id: int = 0,
-        num_shards: int = 1,
-        num_threads: int = 4,
-        seed: int = 12,
-        data_fraction: float = -1.0,
+            self,
+            data_path: str,
+            batch_size: int,
+            device: str,
+            validation: bool = False,
+            device_id: int = 0,
+            shard_id: int = 0,
+            num_shards: int = 1,
+            num_threads: int = 4,
+            seed: int = 12,
+            data_fraction: float = -1.0,
     ):
         """Initializes the pipeline for validation or linear eval training.
 
@@ -366,6 +367,7 @@ def build_transform_pipeline_dali(dataset, cfg, dali_device):
         "stl10": ((0.4914, 0.4823, 0.4466), (0.247, 0.243, 0.261)),
         "imagenet100": (IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD),
         "imagenet": (IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD),
+        "l3d": (IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD),
     }
 
     mean, std = MEANS_N_STD.get(
@@ -453,20 +455,20 @@ def build_transform_pipeline_dali(dataset, cfg, dali_device):
 
 class PretrainPipelineBuilder:
     def __init__(
-        self,
-        data_path: Union[str, Path],
-        batch_size: int,
-        device: str,
-        transforms: Callable,
-        random_shuffle: bool = True,
-        device_id: int = 0,
-        shard_id: int = 0,
-        num_shards: int = 1,
-        num_threads: int = 4,
-        seed: int = 12,
-        no_labels: bool = False,
-        encode_indexes_into_labels: bool = False,
-        data_fraction: float = -1.0,
+            self,
+            data_path: Union[str, Path],
+            batch_size: int,
+            device: str,
+            transforms: Callable,
+            random_shuffle: bool = True,
+            device_id: int = 0,
+            shard_id: int = 0,
+            num_shards: int = 1,
+            num_threads: int = 4,
+            seed: int = 12,
+            no_labels: bool = False,
+            encode_indexes_into_labels: bool = False,
+            data_fraction: float = -1.0,
     ):
         """Builder for a pretrain pipeline with Nvidia DALI.
 
@@ -595,6 +597,114 @@ class PretrainPipelineBuilder:
         return str(self.transforms)
 
 
+class L3DPretrainPipelineBuilder:
+    def __init__(
+            self,
+            data_path: Union[str, Path],
+            batch_size: int,
+            device: str,
+            transforms: Callable,
+            random_shuffle: bool = True,
+            device_id: int = 0,
+            shard_id: int = 0,
+            num_shards: int = 1,
+            num_threads: int = 4,
+            seed: int = 12,
+            no_labels: bool = True,
+            encode_indexes_into_labels: bool = False,
+            data_fraction: float = -1.0,
+    ):
+        """Builder for a pretrain pipeline with Nvidia DALI.
+
+        Args:
+            data_path (str): directory that contains the data.
+            batch_size (int): batch size.
+            device (str): device on which the operation will be performed.
+            transforms (Callable): list of transformations.
+            num_crops_per_aug (List[int]): number of crops per pipeline.
+            random_shuffle (bool, optional): whether to randomly shuffle the samples.
+                Defaults to True.
+            device_id (int, optional): id of the device used to initialize the seed and
+                for parent class. Defaults to 0.
+            shard_id (int, optional): id of the shard (chuck of samples). Defaults to 0.
+            num_shards (int, optional): total number of shards. Defaults to 1.
+            num_threads (int, optional): number of threads to run in parallel. Defaults to 4.
+            seed (int, optional): seed for random number generation. Defaults to 12.
+            no_labels (bool, optional): if the data has no labels. Defaults to False.
+            encode_indexes_into_labels (bool, optional): uses sample indexes as labels
+                and then gets the labels from a lookup table. This may use more CPU memory,
+                so just use when needed. Defaults to False.
+            data_fraction (float): percentage of data to use. Use all data when set to -1.
+                Defaults to -1.
+        """
+
+        super().__init__()
+
+        self.batch_size = batch_size
+        self.num_threads = num_threads
+        self.device_id = device_id
+        self.seed = seed + device_id
+
+        self.device = device
+
+        data_path = Path(data_path)
+
+        # manually load files and labels
+        if no_labels:
+            files = self._load_data(data_path)
+            labels = [-1] * len(files)
+        else:
+            raise NotImplementedError
+
+        self.reader = ops.readers.File(
+            files=files,
+            labels=labels,
+            shard_id=shard_id,
+            num_shards=num_shards,
+            shuffle_after_epoch=random_shuffle,
+        )
+
+        decoder_device = "mixed" if self.device == "gpu" else "cpu"
+        device_memory_padding = 211025920 if decoder_device == "mixed" else 0
+        host_memory_padding = 140544512 if decoder_device == "mixed" else 0
+        self.decode = ops.decoders.Image(
+            device=decoder_device,
+            output_type=types.RGB,
+            device_memory_padding=device_memory_padding,
+            host_memory_padding=host_memory_padding,
+        )
+        self.to_int64 = ops.Cast(dtype=types.INT64, device=device)
+
+        self.transforms = transforms
+
+    @staticmethod
+    def _load_data(self, data_path, split='train'):
+        df = pd.read_csv(os.path.join(data_path, split + '.csv'))
+        data = [os.path.join(data_path, i) for i in df.image_uri.tolist()]
+        return data
+
+    @pipeline_def
+    def pipeline(self):
+        """Defines the computational pipeline for dali operations."""
+
+        # read images from memory
+        inputs, labels = self.reader(name="Reader")
+
+        images = self.decode(inputs)
+
+        crops = self.transforms(images)
+
+        if self.device == "gpu":
+            labels = labels.gpu()
+        # PyTorch expects labels as INT64
+        labels = self.to_int64(labels)
+
+        return (*crops, labels)
+
+    def __repr__(self) -> str:
+        return str(self.transforms)
+
+
 class BaseWrapper(DALIGenericIterator):
     """Temporary fix to handle LastBatchPolicy.DROP."""
 
@@ -618,14 +728,14 @@ class BaseWrapper(DALIGenericIterator):
 
 class PretrainWrapper(BaseWrapper):
     def __init__(
-        self,
-        model_batch_size: int,
-        model_rank: int,
-        model_device: str,
-        dataset_size: int,
-        conversion_map: List[int] = None,
-        *args,
-        **kwargs,
+            self,
+            model_batch_size: int,
+            model_rank: int,
+            model_device: str,
+            dataset_size: int,
+            conversion_map: List[int] = None,
+            *args,
+            **kwargs,
     ):
         """Adds indices to a batch fetched from the parent.
 
@@ -668,8 +778,8 @@ class PretrainWrapper(BaseWrapper):
             # creates dummy indexes
             indexes = (
                 (
-                    torch.arange(self.model_batch_size, device=self.model_device)
-                    + (self.model_rank * self.model_batch_size)
+                        torch.arange(self.model_batch_size, device=self.model_device)
+                        + (self.model_rank * self.model_batch_size)
                 )
                 .detach()
                 .clone()
@@ -705,18 +815,18 @@ class Wrapper(BaseWrapper):
 
 class PretrainDALIDataModule(pl.LightningDataModule):
     def __init__(
-        self,
-        dataset: str,
-        train_data_path: Union[str, Path],
-        transforms: List[Callable],
-        num_large_crops: int,
-        num_small_crops: int,
-        batch_size: int,
-        num_workers: int = 4,
-        no_labels=False,
-        data_fraction: float = -1.0,
-        dali_device: str = "gpu",
-        encode_indexes_into_labels: bool = False,
+            self,
+            dataset: str,
+            train_data_path: Union[str, Path],
+            transforms: List[Callable],
+            num_large_crops: int,
+            num_small_crops: int,
+            batch_size: int,
+            num_workers: int = 4,
+            no_labels=False,
+            data_fraction: float = -1.0,
+            dali_device: str = "gpu",
+            encode_indexes_into_labels: bool = False,
     ):
         """DataModule for pretrain data using Nvidia DALI.
 
@@ -817,9 +927,64 @@ class PretrainDALIDataModule(pl.LightningDataModule):
         train_pipeline.build()
 
         output_map = (
-            [f"large{i}" for i in range(self.num_large_crops)]
-            + [f"small{i}" for i in range(self.num_small_crops)]
-            + ["label"]
+                [f"large{i}" for i in range(self.num_large_crops)]
+                + [f"small{i}" for i in range(self.num_small_crops)]
+                + ["label"]
+        )
+
+        policy = LastBatchPolicy.DROP
+        conversion_map = (
+            train_pipeline_builder.conversion_map if self.encode_indexes_into_labels else None
+        )
+        train_loader = PretrainWrapper(
+            model_batch_size=self.batch_size,
+            model_rank=self.device_id,
+            model_device=self.device,
+            dataset_size=train_pipeline.epoch_size("Reader"),
+            conversion_map=conversion_map,
+            pipelines=train_pipeline,
+            output_map=output_map,
+            reader_name="Reader",
+            last_batch_policy=policy,
+            auto_reset=True,
+        )
+
+        return train_loader
+
+
+class L3DPretrainDALIDataModule(PretrainDALIDataModule):
+    def __init__(self, dataset: str, train_data_path: Union[str, Path], transforms: List[Callable],
+                 num_large_crops: int, num_small_crops: int, batch_size: int, num_workers: int = 4, no_labels=False,
+                 data_fraction: float = -1.0, dali_device: str = "gpu", encode_indexes_into_labels: bool = False):
+        super().__init__(dataset, train_data_path, transforms, num_large_crops, num_small_crops, batch_size,
+                         num_workers, no_labels, data_fraction, dali_device, encode_indexes_into_labels)
+
+    def train_dataloader(self):
+        train_pipeline_builder = L3DPretrainPipelineBuilder(
+            self.train_data_path,
+            batch_size=self.batch_size,
+            transforms=self.transforms,
+            device=self.dali_device,
+            device_id=self.device_id,
+            shard_id=self.shard_id,
+            num_shards=self.num_shards,
+            num_threads=self.num_workers,
+            no_labels=self.no_labels,
+            encode_indexes_into_labels=self.encode_indexes_into_labels,
+            data_fraction=self.data_fraction,
+        )
+        train_pipeline = train_pipeline_builder.pipeline(
+            batch_size=train_pipeline_builder.batch_size,
+            num_threads=train_pipeline_builder.num_threads,
+            device_id=train_pipeline_builder.device_id,
+            seed=train_pipeline_builder.seed,
+        )
+        train_pipeline.build()
+
+        output_map = (
+                [f"large{i}" for i in range(self.num_large_crops)]
+                + [f"small{i}" for i in range(self.num_small_crops)]
+                + ["label"]
         )
 
         policy = LastBatchPolicy.DROP
@@ -844,14 +1009,14 @@ class PretrainDALIDataModule(pl.LightningDataModule):
 
 class ClassificationDALIDataModule(pl.LightningDataModule):
     def __init__(
-        self,
-        dataset: str,
-        train_data_path: Union[str, Path],
-        val_data_path: Union[str, Path],
-        batch_size: int,
-        num_workers: int = 4,
-        data_fraction: float = -1.0,
-        dali_device: str = "gpu",
+            self,
+            dataset: str,
+            train_data_path: Union[str, Path],
+            val_data_path: Union[str, Path],
+            batch_size: int,
+            num_workers: int = 4,
+            data_fraction: float = -1.0,
+            dali_device: str = "gpu",
     ):
         """DataModule for classification data using Nvidia DALI.
 

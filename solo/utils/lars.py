@@ -100,7 +100,7 @@ class LARS(Optimizer):
         )
         if nesterov and (momentum <= 0 or dampening != 0):
             raise ValueError("Nesterov momentum requires a momentum and zero dampening")
-
+        self.eps = eps
         super().__init__(params, defaults)
 
     def __setstate__(self, state):
