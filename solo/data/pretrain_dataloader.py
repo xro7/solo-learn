@@ -53,8 +53,12 @@ def dataset_with_index(DatasetClass: Type[Dataset]) -> Type[Dataset]:
 
     class DatasetWithIndex(DatasetClass):
         def __getitem__(self, index):
-            data = super().__getitem__(index)
-            return (index, *data)
+            try:
+                data = super().__getitem__(index)
+                return (index, *data)
+            except Exception as e:
+                print(e)
+                return None
 
     return DatasetWithIndex
 
