@@ -11,8 +11,8 @@ hydra:
   run:
     dir: .
 
-name: "byol-l3d"
-method: "byol"
+name: "mocov3-imagenet100"
+method: "mocov3"
 backbone:
   name: "resnet50"
   use_pretrained: true
@@ -20,10 +20,10 @@ method_kwargs:
   proj_hidden_dim: 4096
   proj_output_dim: 256
   pred_hidden_dim: 4096
+  temperature: 0.2
 momentum:
   base_tau: 0.99
   final_tau: 1.0
-  classifer: false
 data:
   dataset: l3d
   train_path: "/home/xronis/mnt/L3D/data"
@@ -32,13 +32,13 @@ data:
   num_workers: 4
 optimizer:
   name: "lars"
-  batch_size: 64
-  lr: 0.45
-  classifier_lr: 0.2
+  batch_size: 128
+  lr: 0.3
+  classifier_lr: 0.3
   weight_decay: 1e-6
   kwargs:
-    clip_lr: False
-    eta: 0.001
+    clip_lr: True
+    eta: 0.02
     exclude_bias_n_norm: True
 scheduler:
   name: "warmup_cosine"
@@ -50,11 +50,9 @@ auto_resume:
   enabled: True
 
 # overwrite PL stuff
-max_epochs: 100
+max_epochs: 400
 devices: [0]
 sync_batchnorm: True
 accelerator: "gpu"
-strategy: None
+strategy: "ddp"
 precision: 16
-accumulate_grad_batches: 16
-#resume_from_checkpoint: /home/xronis/Projects/solo-learn/trained_models/byol-resnet50-imagenet-100ep-25x5nqle-ep=99.ckpt

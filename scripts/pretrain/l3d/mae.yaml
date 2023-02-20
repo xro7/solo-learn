@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - augmentations: asymmetric.yaml
+  - augmentations: reconstruction.yaml
   - wandb: private.yaml
   - override hydra/hydra_logging: disabled
   - override hydra/job_logging: disabled
@@ -11,19 +11,19 @@ hydra:
   run:
     dir: .
 
-name: "byol-l3d"
-method: "byol"
+name: "mae-l3d"
+method: "mae"
 backbone:
-  name: "resnet50"
-  use_pretrained: true
+  name: "vit_base"
 method_kwargs:
-  proj_hidden_dim: 4096
-  proj_output_dim: 256
-  pred_hidden_dim: 4096
+  decoder_embed_dim: 512
+  decoder_depth: 8
+  decoder_num_heads: 16
+  mask_ratio: 0.75
+  norm_pix_loss: True
 momentum:
-  base_tau: 0.99
+  base_tau: 0.9995
   final_tau: 1.0
-  classifer: false
 data:
   dataset: l3d
   train_path: "/home/xronis/mnt/L3D/data"
@@ -31,17 +31,16 @@ data:
   format: "none"
   num_workers: 4
 optimizer:
-  name: "lars"
+  name: "adamw"
   batch_size: 64
-  lr: 0.45
-  classifier_lr: 0.2
-  weight_decay: 1e-6
+  lr: 2.0e-4
+  classifier_lr: 2.0e-4
+  weight_decay: 0.05
   kwargs:
-    clip_lr: False
-    eta: 0.001
-    exclude_bias_n_norm: True
+    betas: [0.9, 0.95]q
 scheduler:
   name: "warmup_cosine"
+  warmup_start_lr: 0.0
 checkpoint:
   enabled: True
   dir: "trained_models"
@@ -50,11 +49,9 @@ auto_resume:
   enabled: True
 
 # overwrite PL stuff
-max_epochs: 100
+max_epochs: 400
 devices: [0]
 sync_batchnorm: True
 accelerator: "gpu"
-strategy: None
+strategy: null
 precision: 16
-accumulate_grad_batches: 16
-#resume_from_checkpoint: /home/xronis/Projects/solo-learn/trained_models/byol-resnet50-imagenet-100ep-25x5nqle-ep=99.ckpt
