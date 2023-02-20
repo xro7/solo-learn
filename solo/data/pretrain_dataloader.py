@@ -22,6 +22,7 @@ import random
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Type, Union
 
+import numpy as np
 import pandas as pd
 import torch
 import torchvision
@@ -77,15 +78,15 @@ class L3D(Dataset):
 
     def __getitem__(self, index):
 
-        try:
-            path = self.root / self.images[index]
-            x = Image.open(path).convert("RGB")
-            if self.transform is not None:
-                x = self.transform(x)
-        except Exception as e:
-            print(e)
-            return None
-        return x, -1
+        while 1:
+            try:
+                path = self.root / self.images[index]
+                x = Image.open(path).convert("RGB")
+                if self.transform is not None:
+                    x = self.transform(x)
+                return x, -1
+            except Exception as e:
+                index = np.random.randint(0, len(self.images))
 
     def __len__(self):
         return len(self.images)

@@ -74,7 +74,7 @@ def main(cfg: DictConfig):
         assert cfg.method in ["wmse", "mae"]
 
     model = METHODS[cfg.method](cfg)
-    print(model)
+    # print(model)
     make_contiguous(model)
     # can provide up to ~20% speed up
     if not cfg.performance.disable_channel_last:

@@ -297,7 +297,7 @@ class BaseMethod(pl.LightningModule):
         # default parameters for performance optimization
         cfg.performance = omegaconf_select(cfg, "performance", {})
         cfg.performance.disable_channel_last = omegaconf_select(
-            cfg, "performance.disable_channel_last", False
+            cfg, "performance.disable_channel_last", True
         )
 
         # default empty parameters for method-specific kwargs
