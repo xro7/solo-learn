@@ -282,6 +282,13 @@ def build_transform_pipeline(dataset, cfg):
                 p=cfg.color_jitter.prob,
             ),
         )
+    if cfg.rotation.prob:
+        augmentations.append(
+            transforms.RandomApply(transforms.RandomRotation(degrees=cfg.rotation.degrees), p=cfg.rotation.prob))
+
+    if cfg.perspective.prob:
+        augmentations.append(
+            transforms.RandomPerspective(distortion_scale=cfg.perspective.scale, p=cfg.perspective.prob))
 
     if cfg.grayscale.prob:
         augmentations.append(transforms.RandomGrayscale(p=cfg.grayscale.prob))
