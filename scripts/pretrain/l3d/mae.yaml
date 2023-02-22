@@ -37,7 +37,7 @@ optimizer:
   classifier_lr: 2.0e-4
   weight_decay: 0.05
   kwargs:
-    betas: [0.9, 0.95]q
+    betas: [0.9, 0.95]
 scheduler:
   name: "warmup_cosine"
   warmup_start_lr: 0.0
