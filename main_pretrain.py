@@ -76,6 +76,12 @@ def main(cfg: DictConfig):
     model = METHODS[cfg.method](cfg)
     # print(model)
     make_contiguous(model)
+
+    if 'resume_only_model' in cfg and 'ckpt_path' in cfg:
+        if cfg.resume_only_model and cfg.ckpt_path is not None:
+            ckpt = torch.load(cfg.ckpt_path)
+            res = model.load_state_dict(ckpt['state_dict'], strict=True)
+            print('Loading model: ' + str(res))
     # can provide up to ~20% speed up
     if not cfg.performance.disable_channel_last:
         model = model.to(memory_format=torch.channels_last)

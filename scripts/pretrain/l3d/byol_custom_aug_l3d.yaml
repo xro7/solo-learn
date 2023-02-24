@@ -11,7 +11,7 @@ hydra:
   run:
     dir: .
 
-name: "byol-l3d"
+name: "byol-l3d-custom-augs"
 method: "byol"
 backbone:
   name: "resnet50"
