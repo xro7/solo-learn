@@ -41,6 +41,7 @@ optimizer:
 scheduler:
   name: "warmup_cosine"
   warmup_start_lr: 0.0
+  warmup_epochs: 5
 checkpoint:
   enabled: True
   dir: "trained_models"
@@ -49,7 +50,7 @@ auto_resume:
   enabled: True
 
 # overwrite PL stuff
-max_epochs: 400
+max_epochs: 100
 devices: [0]
 sync_batchnorm: True
 accelerator: "gpu"

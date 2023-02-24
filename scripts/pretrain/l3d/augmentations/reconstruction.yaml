@@ -1,7 +1,13 @@
 - rrc:
     enabled: True
-    crop_min_scale: 0.08
+    crop_min_scale: 0.5
     crop_max_scale: 1.0
+  rotation:
+    degrees: 20
+    prob: 0.1
+  perspective:
+    scale: 0.4
+    prob: 0.1
   color_jitter:
     prob: 0.0
   grayscale:
