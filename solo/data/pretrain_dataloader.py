@@ -285,7 +285,7 @@ def build_transform_pipeline(dataset, cfg):
     if 'rotation' in cfg:
         if cfg.rotation.prob:
             augmentations.append(
-                transforms.RandomApply(transforms.RandomRotation(degrees=cfg.rotation.degrees), p=cfg.rotation.prob))
+                transforms.RandomApply([transforms.RandomRotation(degrees=cfg.rotation.degrees)], p=cfg.rotation.prob))
     if 'perspective' in cfg:
         if cfg.perspective.prob:
             augmentations.append(
