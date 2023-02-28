@@ -80,7 +80,7 @@ def main(cfg: DictConfig):
     if 'resume_only_model' in cfg and 'ckpt_path' in cfg:
         if cfg.resume_only_model and cfg.ckpt_path is not None:
             ckpt = torch.load(cfg.ckpt_path)
-            res = model.load_state_dict(ckpt['state_dict'], strict=True)
+            res = model.load_state_dict(ckpt['state_dict'], strict=False)
             print('Loading model: ' + str(res))
     # can provide up to ~20% speed up
     if not cfg.performance.disable_channel_last:
