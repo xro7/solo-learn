@@ -76,6 +76,8 @@ class L3D(Dataset):
     def _load_data(data_path, split='train'):
         df = pd.read_csv(os.path.join(data_path, split + '.csv'))
         data = [os.path.join(data_path, i) for i in df.image_uri.tolist()]
+        df = pd.read_csv(os.path.join(data_path, 'val' + '.csv'))
+        data = data + [os.path.join(data_path, i) for i in df.image_uri.tolist()]
         return data
 
     def __getitem__(self, index):
