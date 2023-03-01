@@ -519,6 +519,8 @@ def get_albumentations(image_size=224):
 
     ])}
 
+    return augmentations
+
 
 class AugApplier:
 
