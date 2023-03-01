@@ -460,7 +460,8 @@ def get_albumentations(image_size=224):
                 A.LongestMaxSize(max_size=image_size),
                 A.PadIfNeeded(min_height=image_size, min_width=image_size, border_mode=0, value=0),
             ], p=0.3),
-            A.RandomResizedCrop(image_size, image_size, scale=(0.85, 1.0), ratio=(1.0, 3), p=0.7)
+            A.RandomResizedCrop(image_size, image_size, scale=(0.85, 1.0), ratio=(1.0, 3), p=0.45),
+            A.Resize(image_size, image_size, p=0.25)
         ], p=1.0),
 
         A.OneOf([
@@ -473,7 +474,7 @@ def get_albumentations(image_size=224):
             A.ChannelShuffle(p=1.0),
             A.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, p=1.0),
             A.FancyPCA(p=0.1),
-        ], p=0.3),
+        ], p=0.4),
 
         A.OneOf([
             A.GaussianBlur(blur_limit=5, p=1.0),
@@ -488,7 +489,8 @@ def get_albumentations(image_size=224):
                 A.LongestMaxSize(max_size=image_size),
                 A.PadIfNeeded(min_height=image_size, min_width=image_size, border_mode=0, value=0),
             ], p=0.3),
-            A.RandomResizedCrop(image_size, image_size, scale=(0.85, 1.0), ratio=(1.0, 3), p=0.7)
+            A.RandomResizedCrop(image_size, image_size, scale=(0.85, 1.0), ratio=(1.0, 3), p=0.45),
+            A.Resize(image_size, image_size, p=0.25)
         ], p=1.0),
 
         A.OneOf([
@@ -501,7 +503,7 @@ def get_albumentations(image_size=224):
             A.ChannelShuffle(p=1.0),
             A.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, p=1.0),
             A.FancyPCA(p=0.1),
-        ], p=0.3),
+        ], p=0.4),
 
         A.OneOf([
             A.GaussianBlur(blur_limit=5, p=1.0),
@@ -516,8 +518,6 @@ def get_albumentations(image_size=224):
         ToTensorV2()
 
     ])}
-
-    return augmentations
 
 
 class AugApplier:
