@@ -36,6 +36,8 @@ from solo.data.pretrain_dataloader import (
     build_transform_pipeline,
     prepare_dataloader,
     prepare_datasets,
+    get_albumentations,
+    AugApplier,
 )
 from solo.methods import METHODS
 from solo.utils.auto_resumer import AutoResumer
@@ -154,6 +156,25 @@ def main(cfg: DictConfig):
                 encode_indexes_into_labels=cfg.dali.encode_indexes_into_labels,
             )
         dali_datamodule.val_dataloader = lambda: val_loader
+    elif cfg.data.format == "albumentations":
+        print('albumentation transforms')
+        augmentations = get_albumentations(image_size=224)
+        transform = AugApplier(augmentations, mode='train', number_of_augs=2)
+        if cfg.debug_augmentations:
+            print("Transforms:")
+            print(augmentations)
+
+        train_dataset = prepare_datasets(
+            cfg.data.dataset,
+            transform,
+            train_data_path=cfg.data.train_path,
+            data_format=cfg.data.format,
+            no_labels=cfg.data.no_labels,
+            data_fraction=cfg.data.fraction,
+        )
+        train_loader = prepare_dataloader(
+            train_dataset, batch_size=cfg.optimizer.batch_size, num_workers=cfg.data.num_workers
+        )
     else:
         pipelines = []
         for aug_cfg in cfg.augmentations:
