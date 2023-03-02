@@ -91,7 +91,7 @@ def main(cfg: DictConfig):
     # validation dataloader for when it is available
     if cfg.data.dataset == "custom" and (cfg.data.no_labels or cfg.data.val_path is None):
         val_loader = None
-    elif cfg.data.dataset in ["l3d"] and cfg.data.val_path is None:
+    elif cfg.data.dataset in ["l3d"]:
         val_loader = None
     elif cfg.data.dataset in ["imagenet100", "imagenet"] and cfg.data.val_path is None:
         val_loader = None
