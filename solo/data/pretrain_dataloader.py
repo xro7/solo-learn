@@ -96,6 +96,41 @@ class L3D(Dataset):
         return len(self.images)
 
 
+class LOGO2K(Dataset):
+    def __init__(self, root, transform=None, split='test'):
+        self.root = Path(root)
+        self.transform = transform
+        self.split = split
+        self.data = self._load_data()
+
+    def _load_data(self):
+        if self.split == 'test':
+            path = os.path.join(self.root, 'List', 'test_images_root.txt')
+            self.image_root = os.path.join(self.root, 'train_and_test', self.split)
+        elif self.split == 'train':
+            path = os.path.join(self.root, 'List', 'test_images_root.txt')
+            self.image_root = os.path.join(self.root, 'train_and_test', self.split)
+        else:
+            raise Exception(f'{self.split} does not exist')
+
+        df = pd.read_csv(path, header=None)
+        data = [os.path.join(self.image_root, i) for i in df[0].tolist()]
+        category = [i.split('/')[0] for i in df[0].tolist()]
+        class_name = [i.split('/')[1] for i in df[0].tolist()]
+        return list(zip(data, category, class_name))
+
+    def __getitem__(self, index):
+
+        path, category, class_name = self.data[index]
+        x = Image.open(path).convert("RGB")
+        if self.transform is not None:
+            x = self.transform(x)
+        return x, class_name
+
+    def __len__(self):
+        return len(self.images)
+
+
 class CustomDatasetWithoutLabels(Dataset):
     def __init__(self, root, transform=None):
         self.root = Path(root)
@@ -429,10 +464,12 @@ def drop_none_collate(batch):
 
 
 def prepare_dataloader(
-        train_dataset: Dataset, batch_size: int = 64, num_workers: int = 4
+        train_dataset: Dataset, batch_size: int = 64, num_workers: int = 4, shuffle=True, drop_last=True
 ) -> DataLoader:
     """Prepares the training dataloader for pretraining.
     Args:
+        drop_last:
+        shuffle:
         train_dataset (Dataset): the name of the dataset.
         batch_size (int, optional): batch size. Defaults to 64.
         num_workers (int, optional): number of workers. Defaults to 4.
@@ -443,10 +480,10 @@ def prepare_dataloader(
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=True,
-        drop_last=True,
+        drop_last=drop_last,
         collate_fn=drop_none_collate
     )
     return train_loader
@@ -517,7 +554,18 @@ def get_albumentations(image_size=224):
         ),
         ToTensorV2()
 
-    ])}
+    ]), 'val': A.Compose([
+
+        A.LongestMaxSize(max_size=image_size),
+        A.PadIfNeeded(min_height=image_size, min_width=image_size, border_mode=0, value=0),
+        A.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225],
+        ),
+        ToTensorV2()
+    ])
+
+    }
 
     return augmentations
 

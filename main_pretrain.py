@@ -24,7 +24,7 @@ import hydra
 import torch
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import Trainer, seed_everything
-from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.strategies.ddp import DDPStrategy
 
@@ -160,6 +160,7 @@ def main(cfg: DictConfig):
         print('albumentation transforms')
         augmentations = get_albumentations(image_size=224)
         transform = AugApplier(augmentations, mode='train', number_of_augs=2)
+        val_transform = AugApplier(augmentations, mode='val', number_of_augs=1)
         if cfg.debug_augmentations:
             print("Transforms:")
             print(augmentations)
@@ -175,6 +176,21 @@ def main(cfg: DictConfig):
         train_loader = prepare_dataloader(
             train_dataset, batch_size=cfg.optimizer.batch_size, num_workers=cfg.data.num_workers
         )
+
+        if 'val_dataset' in cfg.data and cfg.data.val_dataset == 'logo2k':
+            print('init logo2k val')
+            val_dataset = prepare_datasets(
+                cfg.data.val_dataset,
+                val_transform,
+                train_data_path=cfg.data.val_path,
+                data_format=cfg.data.format,
+                no_labels=cfg.data.no_labels,
+                data_fraction=cfg.data.fraction,
+            )
+            val_loader = prepare_dataloader(
+                val_dataset, batch_size=cfg.optimizer.batch_size, num_workers=cfg.data.num_workers, shuffle=False,
+                drop_last=False
+            )
     else:
         pipelines = []
         for aug_cfg in cfg.augmentations:
@@ -230,7 +246,11 @@ def main(cfg: DictConfig):
             frequency=cfg.checkpoint.frequency,
             keep_prev=cfg.checkpoint.keep_prev,
         )
+        ckpt2 = ModelCheckpoint(dirpath=os.path.join(cfg.checkpoint.dir, cfg.method), filename='{epoch}-{f1:.2f}}',
+                                monitor='f1', mode='max', save_top_k=2)
+
         callbacks.append(ckpt)
+        callbacks.append(ckpt2)
 
     if cfg.auto_umap.enabled:
         assert (
@@ -253,7 +273,7 @@ def main(cfg: DictConfig):
             resume="allow" if wandb_run_id else None,
             id=wandb_run_id,
         )
-        wandb_logger.watch(model, log="gradients", log_freq=100)
+        # wandb_logger.watch(model, log="gradients", log_freq=100)
         wandb_logger.log_hyperparams(OmegaConf.to_container(cfg))
 
         # lr logging
@@ -298,6 +318,8 @@ def main(cfg: DictConfig):
         trainer.fit(model, ckpt_path=ckpt_path, datamodule=dali_datamodule)
     else:
         trainer.fit(model, train_loader, val_loader, ckpt_path=ckpt_path)
+
+
 
 
 if __name__ == "__main__":

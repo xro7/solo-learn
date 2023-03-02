@@ -18,9 +18,11 @@
 # DEALINGS IN THE SOFTWARE.
 
 import logging
-from functools import partial
+import operator
+from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
 
+import numpy as np
 import omegaconf
 import pytorch_lightning as pl
 import torch
@@ -56,12 +58,13 @@ from solo.utils.metrics import accuracy_at_k, weighted_mean
 from solo.utils.misc import omegaconf_select, remove_bias_and_norm_from_weight_decay
 from solo.utils.momentum import MomentumUpdater, initialize_momentum_params
 from torch.optim.lr_scheduler import MultiStepLR
+from solo.utils.similarity import evaluate, SimpleSimilarityModule
 
 
 def static_lr(
-    get_lr: Callable,
-    param_group_indexes: Sequence[int],
-    lrs_to_replace: Sequence[float],
+        get_lr: Callable,
+        param_group_indexes: Sequence[int],
+        lrs_to_replace: Sequence[float],
 ):
     lrs = get_lr()
     for idx, lr in zip(param_group_indexes, lrs_to_replace):
@@ -508,7 +511,7 @@ class BaseMethod(pl.LightningModule):
         outs = {k: [out[k] for out in outs] for k in outs[0].keys()}
 
         if self.multicrop:
-            multicrop_outs = [self.multicrop_forward(x) for x in X[self.num_large_crops :]]
+            multicrop_outs = [self.multicrop_forward(x) for x in X[self.num_large_crops:]]
             for k in multicrop_outs[0].keys():
                 outs[k] = outs.get(k, []) + [out[k] for out in multicrop_outs]
 
@@ -551,7 +554,7 @@ class BaseMethod(pl.LightningModule):
         return self._base_shared_step(X, targets)
 
     def validation_step(
-        self, batch: List[torch.Tensor], batch_idx: int, dataloader_idx: int = None
+            self, batch: List[torch.Tensor], batch_idx: int, dataloader_idx: int = None
     ) -> Dict[str, Any]:
         """Validation step for pytorch lightning. It does all the shared operations, such as
         forwarding a batch of images, computing logits and computing metrics.
@@ -568,18 +571,11 @@ class BaseMethod(pl.LightningModule):
         X, targets = batch
         batch_size = targets.size(0)
 
-        out = self.base_validation_step(X, targets)
+        out = self(X)
+        features = out["feats"]
+        res = {'features': features, 'targets': targets}
 
-        if self.knn_eval and not self.trainer.sanity_checking:
-            self.knn(test_features=out.pop("feats").detach(), test_targets=targets.detach())
-
-        metrics = {
-            "batch_size": batch_size,
-            "val_loss": out["loss"],
-            "val_acc1": out["acc1"],
-            "val_acc5": out["acc5"],
-        }
-        return metrics
+        return res
 
     def validation_epoch_end(self, outs: List[Dict[str, Any]]):
         """Averages the losses and accuracies of all the validation batches.
@@ -590,23 +586,40 @@ class BaseMethod(pl.LightningModule):
             outs (List[Dict[str, Any]]): list of outputs of the validation step.
         """
 
-        val_loss = weighted_mean(outs, "val_loss", "batch_size")
-        val_acc1 = weighted_mean(outs, "val_acc1", "batch_size")
-        val_acc5 = weighted_mean(outs, "val_acc5", "batch_size")
+        embeddings = torch.cat([i['features'] for i in outs]).numpy()
+        targets = reduce(operator.concat, [i['targets'] for i in outs])
 
-        log = {"val_loss": val_loss, "val_acc1": val_acc1, "val_acc5": val_acc5}
+        query_indices = [400, 25739, 799, 27085, 2814, 8358, 16415, 15350, 30944, 49299, 11302, 48400, 13257, 2079,
+                         45087,
+                         3394, 5251, 14168, 12871, 16439, 43480, 49856, 11786, 46068, 5224, 13090, 31670, 42278, 31990,
+                         44148, 49419, 45002, 14900,
+                         19194, 29473, 36887, 48964, 38481, 42512, 45976, 46964, 28771, 3016, 34841, 14654, 14047,
+                         15500,
+                         40669, 22107, 28113, 1331, 35091, 23317, 19535, 43268, 39339, 15239, 46815, 35221, 20698,
+                         15785,
+                         8444, 2105, 29198, 45505, 36872, 10415, 48098, 3379, 2391, 1122, 5238, 9550, 5096, 1873, 6753,
+                         242,
+                         18896, 14367, 50007, 50092, 23628, 29938, 20347, 27609, 24116, 21185, 22797, 29589, 28911,
+                         20263, 30104, 14741, 47363, 4329, 22729, 32649, 14442, 20744]
+        K = None
+        metric_K = 100
+        if K is not None:
+            K += 1
 
-        if self.knn_eval and not self.trainer.sanity_checking:
-            val_knn_acc1, val_knn_acc5 = self.knn.compute()
-            log.update({"val_knn_acc1": val_knn_acc1, "val_knn_acc5": val_knn_acc5})
+        print(embeddings.shape)
+        targets = np.array(targets)
+        retrievers = [SimpleSimilarityModule]
+        paths = None
+        log = evaluate(query_indices, embeddings, targets, paths, retrievers, metric_K, K, verbose=False,
+                       plot=False)
 
         self.log_dict(log, sync_dist=True)
 
 
 class BaseMomentumMethod(BaseMethod):
     def __init__(
-        self,
-        cfg: omegaconf.DictConfig,
+            self,
+            cfg: omegaconf.DictConfig,
     ):
         """Base momentum model that implements all basic operations for all self-supervised methods
         that use a momentum backbone. It adds shared momentum arguments, adds basic learnable
@@ -776,13 +789,13 @@ class BaseMomentumMethod(BaseMethod):
         if self.momentum_classifier is not None:
             # momentum loss and stats
             momentum_outs["momentum_loss"] = (
-                sum(momentum_outs["momentum_loss"]) / self.num_large_crops
+                    sum(momentum_outs["momentum_loss"]) / self.num_large_crops
             )
             momentum_outs["momentum_acc1"] = (
-                sum(momentum_outs["momentum_acc1"]) / self.num_large_crops
+                    sum(momentum_outs["momentum_acc1"]) / self.num_large_crops
             )
             momentum_outs["momentum_acc5"] = (
-                sum(momentum_outs["momentum_acc5"]) / self.num_large_crops
+                    sum(momentum_outs["momentum_acc5"]) / self.num_large_crops
             )
 
             metrics = {
@@ -824,8 +837,8 @@ class BaseMomentumMethod(BaseMethod):
         self.last_step = self.trainer.global_step
 
     def validation_step(
-        self, batch: List[torch.Tensor], batch_idx: int, dataloader_idx: int = None
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+            self, batch: List[torch.Tensor], batch_idx: int, dataloader_idx: int = None
+    ) -> dict[str, Any]:
         """Validation step for pytorch lightning. It performs all the shared operations for the
         momentum backbone and classifier, such as forwarding a batch of images in the momentum
         backbone and classifier and computing statistics.
@@ -840,23 +853,23 @@ class BaseMomentumMethod(BaseMethod):
 
         parent_metrics = super().validation_step(batch, batch_idx)
 
-        X, targets = batch
-        batch_size = targets.size(0)
+        # X, targets = batch
+        # batch_size = targets.size(0)
+        #
+        # out = self._shared_step_momentum(X, targets)
+        #
+        # metrics = None
+        # if self.momentum_classifier is not None:
+        #     metrics = {
+        #         "batch_size": batch_size,
+        #         "momentum_val_loss": out["loss"],
+        #         "momentum_val_acc1": out["acc1"],
+        #         "momentum_val_acc5": out["acc5"],
+        #     }
 
-        out = self._shared_step_momentum(X, targets)
+        return parent_metrics
 
-        metrics = None
-        if self.momentum_classifier is not None:
-            metrics = {
-                "batch_size": batch_size,
-                "momentum_val_loss": out["loss"],
-                "momentum_val_acc1": out["acc1"],
-                "momentum_val_acc5": out["acc5"],
-            }
-
-        return parent_metrics, metrics
-
-    def validation_epoch_end(self, outs: Tuple[List[Dict[str, Any]]]):
+    def validation_epoch_end(self, outs: List[Dict[str, Any]]):
         """Averages the losses and accuracies of the momentum backbone / classifier for all the
         validation batches. This is needed because the last batch can be smaller than the others,
         slightly skewing the metrics.
@@ -865,19 +878,4 @@ class BaseMomentumMethod(BaseMethod):
                 and the parent.
         """
 
-        parent_outs = [out[0] for out in outs]
-        super().validation_epoch_end(parent_outs)
-
-        if self.momentum_classifier is not None:
-            momentum_outs = [out[1] for out in outs]
-
-            val_loss = weighted_mean(momentum_outs, "momentum_val_loss", "batch_size")
-            val_acc1 = weighted_mean(momentum_outs, "momentum_val_acc1", "batch_size")
-            val_acc5 = weighted_mean(momentum_outs, "momentum_val_acc5", "batch_size")
-
-            log = {
-                "momentum_val_loss": val_loss,
-                "momentum_val_acc1": val_acc1,
-                "momentum_val_acc5": val_acc5,
-            }
-            self.log_dict(log, sync_dist=True)
+        super().validation_epoch_end(outs)
