@@ -442,6 +442,10 @@ def prepare_datasets(
         dataset_class = L3D
         train_dataset = dataset_with_index(dataset_class)(train_data_path, transform)
 
+    elif dataset == "logo2k":
+        dataset_class = LOGO2K
+        train_dataset = dataset_with_index(dataset_class)(train_data_path, transform)
+
     if data_fraction > 0:
         assert data_fraction < 1, "Only use data_fraction for values smaller than 1."
         data = train_dataset.samples
