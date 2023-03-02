@@ -288,7 +288,7 @@ def main(cfg: DictConfig):
         {
             "logger": wandb_logger if cfg.wandb.enabled else None,
             "callbacks": callbacks,
-            "enable_checkpointing": False,
+            "enable_checkpointing": True,
             "num_nodes": int(cfg.num_nodes) if 'num_nodes' in cfg and cfg.num_nodes is not None else None,
             "strategy": DDPStrategy(find_unused_parameters=False)
             if cfg.strategy == "ddp"
