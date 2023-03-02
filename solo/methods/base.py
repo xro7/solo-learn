@@ -569,7 +569,8 @@ class BaseMethod(pl.LightningModule):
         """
 
         _, X, targets = batch
-        batch_size = targets.size(0)
+        X = X[0] if isinstance(X, List) else X
+        # batch_size = X.size(0)
 
         out = self(X)
         features = out["feats"]
