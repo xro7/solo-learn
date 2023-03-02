@@ -128,7 +128,7 @@ class LOGO2K(Dataset):
         return x, class_name
 
     def __len__(self):
-        return len(self.images)
+        return len(self.data)
 
 
 class CustomDatasetWithoutLabels(Dataset):
