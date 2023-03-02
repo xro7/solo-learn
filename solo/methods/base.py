@@ -587,7 +587,7 @@ class BaseMethod(pl.LightningModule):
             outs (List[Dict[str, Any]]): list of outputs of the validation step.
         """
 
-        embeddings = torch.cat([i['features'] for i in outs]).numpy()
+        embeddings = torch.cat([i['features'] for i in outs]).cpu().numpy()
         targets = reduce(operator.concat, [i['targets'] for i in outs])
 
         query_indices = [400, 25739, 799, 27085, 2814, 8358, 16415, 15350, 30944, 49299, 11302, 48400, 13257, 2079,
