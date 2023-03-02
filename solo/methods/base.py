@@ -568,7 +568,7 @@ class BaseMethod(pl.LightningModule):
                 and accuracies.
         """
 
-        X, targets = batch
+        _, X, targets = batch
         batch_size = targets.size(0)
 
         out = self(X)
