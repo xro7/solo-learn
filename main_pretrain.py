@@ -246,7 +246,7 @@ def main(cfg: DictConfig):
             frequency=cfg.checkpoint.frequency,
             keep_prev=cfg.checkpoint.keep_prev,
         )
-        ckpt2 = ModelCheckpoint(dirpath=os.path.join(cfg.checkpoint.dir, cfg.method), filename='{epoch}-{f1:.2f}}',
+        ckpt2 = ModelCheckpoint(dirpath=os.path.join(cfg.checkpoint.dir, cfg.method), filename='{epoch}-{f1:.2f}',
                                 monitor='f1', mode='max', save_top_k=2)
 
         callbacks.append(ckpt)
@@ -289,7 +289,7 @@ def main(cfg: DictConfig):
             "logger": wandb_logger if cfg.wandb.enabled else None,
             "callbacks": callbacks,
             "enable_checkpointing": True,
-            "num_sanity_val_steps": -1,
+            "num_sanity_val_steps": 0,
             "num_nodes": int(cfg.num_nodes) if 'num_nodes' in cfg and cfg.num_nodes is not None else None,
             "strategy": DDPStrategy(find_unused_parameters=False)
             if cfg.strategy == "ddp"
