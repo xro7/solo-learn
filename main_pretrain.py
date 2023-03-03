@@ -36,9 +36,8 @@ from solo.data.pretrain_dataloader import (
     build_transform_pipeline,
     prepare_dataloader,
     prepare_datasets,
-    get_albumentations,
-    AugApplier,
 )
+from solo.utils.augmentations import get_albumentations, AugApplier, get_albumentations_v2
 from solo.methods import METHODS
 from solo.utils.auto_resumer import AutoResumer
 from solo.utils.checkpointer import Checkpointer
@@ -158,7 +157,7 @@ def main(cfg: DictConfig):
         dali_datamodule.val_dataloader = lambda: val_loader
     elif cfg.data.format == "albumentations":
         print('albumentation transforms')
-        augmentations = get_albumentations(image_size=224)
+        augmentations = get_albumentations_v2(image_size=224)
         transform = AugApplier(augmentations, mode='train', number_of_augs=2)
         val_transform = AugApplier(augmentations, mode='val', number_of_augs=1)
         if cfg.debug_augmentations:
@@ -319,8 +318,6 @@ def main(cfg: DictConfig):
         trainer.fit(model, ckpt_path=ckpt_path, datamodule=dali_datamodule)
     else:
         trainer.fit(model, train_loader, val_loader, ckpt_path=ckpt_path)
-
-
 
 
 if __name__ == "__main__":
