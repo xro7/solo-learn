@@ -118,11 +118,11 @@ def get_albumentations_v2(image_size=224):
             A.ToGray(p=1.0),
         ], p=0.3),
 
-        A.OneOf([
-            A.RandomToneCurve(),
-            A.HorizontalFlip(),
-            A.Sharpen(),
-        ], p=0.3)
+        # A.OneOf([
+        #     A.RandomToneCurve(),
+        #     #A.HorizontalFlip(),
+        #     A.Sharpen(),
+        # ], p=0.1)
 
     ]), 'train': A.Compose([
 
