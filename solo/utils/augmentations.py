@@ -156,7 +156,7 @@ def get_albumentations_v2(image_size=224):
 
         A.OneOf([
             A.RandomToneCurve(),
-            A.HorizontalFlip(),
+            # A.HorizontalFlip(),
             A.Sharpen(),
         ], p=0.3),
 
