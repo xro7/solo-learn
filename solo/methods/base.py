@@ -571,9 +571,9 @@ class BaseMethod(pl.LightningModule):
         _, X, targets = batch
         X = X[0] if isinstance(X, List) else X
         # batch_size = X.size(0)
-
-        out = self(X)
-        features = out["feats"]
+        features = self.backbone(X)
+        # out = self(X)
+        # features = out["feats"]
         res = {'features': features, 'targets': targets}
 
         return res
