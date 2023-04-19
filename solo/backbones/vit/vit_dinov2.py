@@ -20,5 +20,5 @@ def vit_dinov2_large(model_name='dinov2_vitl14'):
 
 def vit_dinov2_base(model_name='dinov2_vitb14'):
     model = DinoVisionTransformer.from_hub(model_name=model_name)
-    model.num_features = 1024
+    model.num_features = 768
     return model
