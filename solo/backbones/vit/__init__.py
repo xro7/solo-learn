@@ -35,6 +35,7 @@ from .vit_mae import vit_base as mae_vit_base
 from .vit_mae import vit_large as mae_vit_large
 
 from .vit_dinov2 import vit_dinov2_large
+from .vit_dinov2 import vit_dinov2_base
 
 
 def get_constructor(method, options, default):
@@ -57,7 +58,7 @@ def vit_small(method, *args, **kwargs):
 
 
 def vit_base(method, *args, **kwargs):
-    custom_backbone_constructor = {"mocov3": mocov3_vit_base, "mae": mae_vit_base}
+    custom_backbone_constructor = {"mocov3": mocov3_vit_base, "mae": mae_vit_base, "byol": vit_dinov2_base}
     return get_constructor(method, custom_backbone_constructor, default_vit_base)(*args, **kwargs)
 
 
