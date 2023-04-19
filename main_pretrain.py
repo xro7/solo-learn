@@ -317,7 +317,9 @@ def main(cfg: DictConfig):
     if cfg.data.format == "dali":
         trainer.fit(model, ckpt_path=ckpt_path, datamodule=dali_datamodule)
     else:
-        trainer.fit(model, train_loader, val_loader, ckpt_path=ckpt_path)
+        if 'validate_first' in cfg and cfg['validate_first']:
+            trainer.validate(model)
+            trainer.fit(model, train_loader, val_loader, ckpt_path=ckpt_path)
 
 
 if __name__ == "__main__":
