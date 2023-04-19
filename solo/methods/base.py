@@ -574,7 +574,7 @@ class BaseMethod(pl.LightningModule):
         features = self.backbone(X)
         # out = self(X)
         # features = out["feats"]
-        res = {'features': features.cpu(), 'targets': targets.cpu()}
+        res = {'features': features.cpu(), 'targets': targets}
 
         return res
 
